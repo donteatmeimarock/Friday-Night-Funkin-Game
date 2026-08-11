@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Friday Night Funkin' - Rhythm Battle</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Permanent+Marker&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- Main Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI Overlay Layer -->
+    <div id="uiOverlay">
+      
+      <!-- Top HUD Header -->
+      <div id="hudHeader" class="hud-element hidden">
+        <div class="hud-pill song-info">
+          <span id="hudSongTitle">Bopeebo Beat</span>
+          <span id="hudDifficulty" class="badge hard">HARD</span>
+        </div>
+        <div class="hud-pill score-info">
+          <div class="stat"><span>SCORE</span><strong id="hudScore">0</strong></div>
+          <div class="stat"><span>ACCURACY</span><strong id="hudAccuracy">100.0%</strong></div>
+          <div class="stat"><span>COMBO</span><strong id="hudCombo">0</strong></div>
+        </div>
+        <button id="pauseBtn" class="icon-btn" title="Pause Game (Esc)">⏸</button>
+      </div>
+
+      <!-- Health Tug-of-War Bar -->
+      <div id="healthBarContainer" class="hud-element hidden">
+        <div class="health-bar-track">
+          <div id="healthFillOpponent" class="health-fill opponent"></div>
+          <div id="healthFillPlayer" class="health-fill player"></div>
+          <div id="healthDivider" class="health-divider"></div>
+        </div>
+        <div id="iconOpponent" class="char-icon opponent-icon">😈</div>
+        <div id="iconPlayer" class="char-icon player-icon">🎤</div>
+      </div>
+
+      <!-- Floating Judgement Popup Container -->
+      <div id="judgementContainer" class="hud-element"></div>
+
+      <!-- Key Binds Visual Guide (Bottom) -->
+      <div id="keyGuide" class="hud-element hidden">
+        <div class="key-group">
+          <span class="key-cap purp">← / A</span>
+          <span class="key-cap cyan">↓ / S</span>
+          <span class="key-cap green">↑ / W</span>
+          <span class="key-cap red">→ / D</span>
+        </div>
+      </div>
+
+      <!-- Main Menu Screen -->
+      <div id="menuScreen" class="screen-overlay active">
+        <div class="backdrop-glow"></div>
+        <div class="menu-card">
+          <div class="logo-container">
+            <h1 class="game-logo">FRIDAY NIGHT <span class="highlight">FUNKIN'</span></h1>
+            <div class="subtitle">RHYTHM BATTLE • WEB EDITION</div>
+          </div>
+
+          <div class="menu-actions">
+            <button id="btnPlay" class="btn primary-btn">
+              <span class="btn-icon">⚡</span> PLAY NOW
+            </button>
+            <button id="btnFreeplay" class="btn secondary-btn">
+              <span class="btn-icon">🎵</span> SONG SELECT
+            </button>
+            <button id="btnEditor" class="btn tertiary-btn">
+              <span class="btn-icon">🛠️</span> CHART EDITOR
+            </button>
+          </div>
+
+          <div class="controls-card">
+            <h3>Controls</h3>
+            <div class="control-tags">
+              <span><b>Arrows</b> (← ↓ ↑ →)</span>
+              <span><b>WASD</b> (A S W D)</span>
+              <span><b>Space / Enter</b> Select</span>
+              <span><b>P / Esc</b> Pause</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Song Select / Freeplay Screen -->
+      <div id="songSelectScreen" class="screen-overlay hidden">
+        <div class="backdrop-glow"></div>
+        <div class="menu-card song-select-card">
+          <h2>SELECT A TRACK</h2>
+          
+          <div id="songList" class="song-list">
+            <!-- Dynamically Populated Songs -->
+          </div>
+
+          <div class="difficulty-picker">
+            <span>DIFFICULTY:</span>
+            <button class="diff-btn" data-diff="easy">EASY</button>
+            <button class="diff-btn active" data-diff="normal">NORMAL</button>
+            <button class="diff-btn" data-diff="hard">HARD</button>
+          </div>
+
+          <div class="card-footer">
+            <button id="btnBackToMenu" class="btn secondary-btn">← BACK TO MENU</button>
+            <button id="btnStartSelectedSong" class="btn primary-btn">START SONG ▶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pause Menu Screen -->
+      <div id="pauseScreen" class="screen-overlay hidden">
+        <div class="menu-card pause-card">
+          <h2>GAME PAUSED</h2>
+          <div class="pause-actions">
+            <button id="btnResume" class="btn primary-btn">RESUME</button>
+            <button id="btnRestart" class="btn secondary-btn">RESTART SONG</button>
+            <button id="btnQuitToMenu" class="btn danger-btn">QUIT TO MENU</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game Over / Blue Balled Screen -->
+      <div id="gameOverScreen" class="screen-overlay hidden">
+        <div class="backdrop-glow red-glow"></div>
+        <div class="menu-card game-over-card">
+          <h1 class="blue-balled-text">BLUE BALLED!</h1>
+          <p id="gameOverQuote" class="quote">"You got funky... but not funky enough!"</p>
+          <div class="final-stats">
+            <div>Score: <strong id="goScore">0</strong></div>
+            <div>Max Combo: <strong id="goCombo">0</strong></div>
+            <div>Accuracy: <strong id="goAccuracy">0%</strong></div>
+          </div>
+          <div class="game-over-actions">
+            <button id="btnRetrySong" class="btn primary-btn">TRY AGAIN ↺</button>
+            <button id="btnGameOverMenu" class="btn secondary-btn">MAIN MENU</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Song Clear / Results Screen -->
+      <div id="resultsScreen" class="screen-overlay hidden">
+        <div class="backdrop-glow gold-glow"></div>
+        <div class="menu-card results-card">
+          <h1 class="clear-title">STAGE CLEARED!</h1>
+          <div id="ratingRankBadge" class="rank-badge rank-s">RANK S</div>
+          
+          <div class="results-grid">
+            <div class="res-item"><span>Final Score</span><strong id="resScore">0</strong></div>
+            <div class="res-item"><span>Accuracy</span><strong id="resAccuracy">0%</strong></div>
+            <div class="res-item"><span>Max Combo</span><strong id="resCombo">0</strong></div>
+            <div class="res-item"><span>SICK Hits</span><strong id="resSick">0</strong></div>
+            <div class="res-item"><span>GOOD Hits</span><strong id="resGood">0</strong></div>
+            <div class="res-item"><span>BAD Hits</span><strong id="resBad">0</strong></div>
+            <div class="res-item"><span>MISSES</span><strong id="resMiss">0</strong></div>
+          </div>
+
+          <div class="results-actions">
+            <button id="btnResReplay" class="btn secondary-btn">REPLAY</button>
+            <button id="btnResNext" class="btn primary-btn">NEXT TRACK ▶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart Editor Screen -->
+      <div id="chartEditorScreen" class="screen-overlay hidden">
+        <div class="editor-header">
+          <h2>🛠️ FNF CHART EDITOR</h2>
+          <div class="editor-controls">
+            <label>Song: 
+              <select id="edSongSelect">
+                <option value="bopeebo">Bopeebo Beat</option>
+                <option value="fresh">Fresh Cyber Jam</option>
+                <option value="demon">Demon Funk Battle</option>
+              </select>
+            </label>
+            <label>BPM: <input type="number" id="edBpm" value="120" min="60" max="300"></label>
+            <label>Speed: <input type="number" id="edScrollSpeed" value="2.2" step="0.1" min="1" max="5"></label>
+            <button id="edPlayBtn" class="btn small-btn">▶ Playtest</button>
+            <button id="edSaveBtn" class="btn small-btn success">💾 Export JSON</button>
+            <button id="edCloseBtn" class="btn small-btn danger">✖ Exit Editor</button>
+          </div>
+        </div>
+
+        <div class="editor-body">
+          <div class="editor-sidebar">
+            <h3>Tools</h3>
+            <p>Click grid to toggle notes.</p>
+            <div class="lane-legend">
+              <span class="legend-opp">Left 4: Opponent</span>
+              <span class="legend-plr">Right 4: Player</span>
+            </div>
+            <label class="checkbox-label">
+              <input type="checkbox" id="edHoldNoteToggle"> Place Hold Note
+            </label>
+            <div class="stat-box">
+              <div>Total Notes: <span id="edTotalNotes">0</span></div>
+              <div>Current Time: <span id="edCurrentTime">0.00s</span></div>
+            </div>
+          </div>
+
+          <div class="editor-grid-container" id="editorGridContainer">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Main Game Logic Script -->
+    <script src="game.js"></script>
+  </body>
+</html>
