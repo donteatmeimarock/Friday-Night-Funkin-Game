@@ -12,20 +12,24 @@
   const LANE_COLORS = ['#c24b99', '#00ffff', '#12fa05', '#f9393f'];
   const LANE_GLOWS = ['rgba(194,75,153,0.9)', 'rgba(0,255,255,0.9)', 'rgba(18,250,5,0.9)', 'rgba(249,57,63,0.9)'];
   
-  // Key Mappings (Arrow Keys & WASD)
-  const KEY_MAP = {
+  // Key Mappings
+  const KEY_MAP_1P = {
     'ArrowLeft': 0, 'KeyA': 0,
     'ArrowDown': 1, 'KeyS': 1,
     'ArrowUp': 2,   'KeyW': 2,
     'ArrowRight': 3, 'KeyD': 3
   };
 
+  // 2 Player Mappings: P1 = WASD (Left Strumline), P2 = ARROWS (Right Strumline)
+  const P1_WASD_MAP = { 'KeyA': 0, 'KeyS': 1, 'KeyW': 2, 'KeyD': 3 };
+  const P2_ARROW_MAP = { 'ArrowLeft': 0, 'ArrowDown': 1, 'ArrowUp': 2, 'ArrowRight': 3 };
+
   // Hit Windows in Seconds (Very Forgiving & Easy)
   const HIT_WINDOWS = {
-    SICK: 0.120,  // 120ms (Very easy SICK rating)
+    SICK: 0.120,  // 120ms
     GOOD: 0.220,  // 220ms
     BAD: 0.320,   // 320ms
-    SHIT: 0.420   // 420ms (Almost half a second leeway!)
+    SHIT: 0.420   // 420ms
   };
 
   // --- AUDIO SYNTHESIZER ENGINE ---
@@ -355,6 +359,7 @@
 
       // State flags
       this.state = 'MENU'; // MENU, SONG_SELECT, PLAYING, PAUSED, GAME_OVER, RESULTS, EDITOR
+      this.gameMode = '1P'; // '1P' (vs Bot) or '2P' (Local Versus)
       this.selectedSong = SONG_CATALOG[0];
       this.selectedDiff = 'easy';
       this.noFailMode = true;
@@ -373,10 +378,21 @@
       this.hits = { sick: 0, good: 0, bad: 0, shit: 0, miss: 0 };
       this.totalNotesHit = 0;
       this.totalNotesProcessed = 0;
-      this.health = 75; // 0 to 100
+
+      // 2 Player Stats
+      this.p1Score = 0;
+      this.p2Score = 0;
+      this.p1Combo = 0;
+      this.p2Combo = 0;
+      this.p1Hits = { sick: 0, good: 0, bad: 0, shit: 0, miss: 0 };
+      this.p2Hits = { sick: 0, good: 0, bad: 0, shit: 0, miss: 0 };
+
+      this.health = 50; // 0 to 100
 
       // Input State
       this.pressedLanes = [false, false, false, false];
+      this.p1PressedLanes = [false, false, false, false];
+      this.p2PressedLanes = [false, false, false, false];
       this.laneGlowTimer = [0, 0, 0, 0];
       this.oppGlowTimer = [0, 0, 0, 0];
 
@@ -405,7 +421,20 @@
       window.addEventListener('keyup', (e) => this.handleKeyUp(e));
 
       // UI Button Bindings
-      document.getElementById('btnPlay').onclick = () => this.openSongSelect();
+      document.getElementById('btnPlay').onclick = () => {
+        this.gameMode = '1P';
+        this.updateModeButtonsUI();
+        this.openSongSelect();
+      };
+      const btn2P = document.getElementById('btn2Player');
+      if (btn2P) {
+        btn2P.onclick = () => {
+          this.gameMode = '2P';
+          this.updateModeButtonsUI();
+          this.openSongSelect();
+        };
+      }
+
       document.getElementById('btnFreeplay').onclick = () => this.openSongSelect();
       document.getElementById('btnEditor').onclick = () => this.openChartEditor();
       document.getElementById('btnBackToMenu').onclick = () => this.showMenu();
@@ -429,6 +458,15 @@
         };
       }
 
+      // Mode Selector buttons (1P vs 2P)
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.onclick = () => {
+          document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.gameMode = btn.dataset.mode;
+        };
+      });
+
       // Difficulty buttons
       document.querySelectorAll('.diff-btn').forEach(btn => {
         if (btn.id === 'btnNoFailToggle') return;
@@ -447,6 +485,13 @@
       document.getElementById('edSaveBtn').onclick = () => this.exportChartJSON();
 
       this.renderSongList();
+    }
+
+    updateModeButtonsUI() {
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        if (btn.dataset.mode === this.gameMode) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
     }
 
     resizeCanvas() {
@@ -524,11 +569,31 @@
       this.hits = { sick: 0, good: 0, bad: 0, shit: 0, miss: 0 };
       this.totalNotesHit = 0;
       this.totalNotesProcessed = 0;
-      this.health = 75; // Starting with 75% health
+
+      // Reset 2P Stats
+      this.p1Score = 0;
+      this.p2Score = 0;
+      this.p1Combo = 0;
+      this.p2Combo = 0;
+
+      this.health = (this.gameMode === '2P') ? 50 : 75; // 50/50 split in 2P versus, 75% in 1P casual!
       this.scheduledBeat = 0;
 
+      // Key Guide Switch
+      const guide1P = document.getElementById('keyGuide1P');
+      const guide2P = document.getElementById('keyGuide2P');
+      if (guide1P && guide2P) {
+        if (this.gameMode === '2P') {
+          guide1P.classList.add('hidden');
+          guide2P.classList.remove('hidden');
+        } else {
+          guide1P.classList.remove('hidden');
+          guide2P.classList.add('hidden');
+        }
+      }
+
       // Update HUD Labels
-      document.getElementById('hudSongTitle').textContent = this.selectedSong.title;
+      document.getElementById('hudSongTitle').textContent = `${this.selectedSong.title} (${this.gameMode === '2P' ? '2P VERSUS' : '1 PLAYER'})`;
       const diffBadge = document.getElementById('hudDifficulty');
       diffBadge.textContent = this.selectedDiff.toUpperCase();
       diffBadge.className = `badge ${this.selectedDiff}`;
@@ -612,26 +677,38 @@
       }
     }
 
-    // Process Notes (Opponent Bot Auto-hit & Player Miss Expiry)
+    // Process Notes (Opponent Bot Auto-hit in 1P, or 2P manual hit checks)
     updateNotes() {
       const windowMiss = HIT_WINDOWS.SHIT;
 
       this.notes.forEach(note => {
         if (note.processed) return;
 
-        // Opponent Bot Note Processing
-        if (!note.isPlayer && this.currentTime >= note.time) {
-          note.processed = true;
-          this.oppPose = LANE_NAMES[note.lane];
-          this.oppPoseTimer = 0.25;
-          this.oppGlowTimer[note.lane] = 0.2;
-          this.synth.playVocalNote(note.lane, false, this.synth.ctx.currentTime);
-        }
+        if (this.gameMode === '1P') {
+          // 1 Player Mode: Opponent Bot Auto-hits Left Notes
+          if (!note.isPlayer && this.currentTime >= note.time) {
+            note.processed = true;
+            this.oppPose = LANE_NAMES[note.lane];
+            this.oppPoseTimer = 0.25;
+            this.oppGlowTimer[note.lane] = 0.2;
+            this.synth.playVocalNote(note.lane, false, this.synth.ctx.currentTime);
+          }
 
-        // Player Missed Note (scrolled past hit window)
-        if (note.isPlayer && !note.hit && (this.currentTime - note.time) > windowMiss) {
-          note.processed = true;
-          this.handleMiss();
+          // Player Missed Right Note
+          if (note.isPlayer && !note.hit && (this.currentTime - note.time) > windowMiss) {
+            note.processed = true;
+            this.handleMiss();
+          }
+        } else {
+          // 2 Player Mode: Both P1 (Left) and P2 (Right) manually hit their notes!
+          if (!note.isPlayer && !note.hit && (this.currentTime - note.time) > windowMiss) {
+            note.processed = true;
+            this.handleP1Miss();
+          }
+          if (note.isPlayer && !note.hit && (this.currentTime - note.time) > windowMiss) {
+            note.processed = true;
+            this.handleP2Miss();
+          }
         }
       });
     }
@@ -646,29 +723,57 @@
 
       if (this.state !== 'PLAYING') return;
 
-      const lane = KEY_MAP[e.code];
-      if (lane !== undefined) {
-        if (!this.pressedLanes[lane]) {
-          this.pressedLanes[lane] = true;
-          this.laneGlowTimer[lane] = 0.2;
-          this.processPlayerHit(lane);
+      if (this.gameMode === '1P') {
+        const lane = KEY_MAP_1P[e.code];
+        if (lane !== undefined) {
+          if (!this.pressedLanes[lane]) {
+            this.pressedLanes[lane] = true;
+            this.laneGlowTimer[lane] = 0.2;
+            this.processPlayerHit(lane);
+          }
+        }
+      } else {
+        // 2 Player Mode: P1 = WASD (Left Strumline), P2 = ARROWS (Right Strumline)
+        const p1Lane = P1_WASD_MAP[e.code];
+        if (p1Lane !== undefined) {
+          if (!this.p1PressedLanes[p1Lane]) {
+            this.p1PressedLanes[p1Lane] = true;
+            this.oppGlowTimer[p1Lane] = 0.2;
+            this.processP1Hit(p1Lane);
+          }
+        }
+
+        const p2Lane = P2_ARROW_MAP[e.code];
+        if (p2Lane !== undefined) {
+          if (!this.p2PressedLanes[p2Lane]) {
+            this.p2PressedLanes[p2Lane] = true;
+            this.laneGlowTimer[p2Lane] = 0.2;
+            this.processP2Hit(p2Lane);
+          }
         }
       }
     }
 
     handleKeyUp(e) {
-      const lane = KEY_MAP[e.code];
-      if (lane !== undefined) {
-        this.pressedLanes[lane] = false;
+      if (this.gameMode === '1P') {
+        const lane = KEY_MAP_1P[e.code];
+        if (lane !== undefined) {
+          this.pressedLanes[lane] = false;
+        }
+      } else {
+        const p1Lane = P1_WASD_MAP[e.code];
+        if (p1Lane !== undefined) this.p1PressedLanes[p1Lane] = false;
+
+        const p2Lane = P2_ARROW_MAP[e.code];
+        if (p2Lane !== undefined) this.p2PressedLanes[p2Lane] = false;
       }
     }
 
+    // --- 1 PLAYER HIT HANDLER ---
     processPlayerHit(lane) {
-      // Find earliest unhit player note in this lane
       const targetNote = this.notes.find(n => n.isPlayer && !n.processed && n.lane === lane);
 
       if (!targetNote) {
-        // Pressing key without note - play vocal tone without health penalty
         this.playerPose = LANE_NAMES[lane];
         this.playerPoseTimer = 0.2;
         this.synth.playVocalNote(lane, true, this.synth.ctx.currentTime);
@@ -690,7 +795,7 @@
           scoreAdd = 350;
           hpAdd = 5.0;
           this.hits.sick++;
-          this.spawnSparkles(lane);
+          this.spawnSparkles(lane, true);
         } else if (diff <= HIT_WINDOWS.GOOD) {
           rating = 'GOOD';
           scoreAdd = 200;
@@ -712,7 +817,6 @@
         this.totalNotesProcessed++;
         this.health = Math.min(100, Math.max(0, this.health + hpAdd));
 
-        // Trigger Vocal Synth & Character Pose
         this.playerPose = LANE_NAMES[lane];
         this.playerPoseTimer = 0.25;
         this.synth.playVocalNote(lane, true, this.synth.ctx.currentTime);
@@ -721,9 +825,89 @@
         this.showJudgement(rating);
         this.updateHUD();
       } else {
-        // Hit too early
         this.handleMiss();
       }
+    }
+
+    // --- 2 PLAYER HIT HANDLERS ---
+    processP1Hit(lane) {
+      const targetNote = this.notes.find(n => !n.isPlayer && !n.processed && n.lane === lane);
+
+      if (!targetNote) {
+        this.oppPose = LANE_NAMES[lane];
+        this.oppPoseTimer = 0.2;
+        this.synth.playVocalNote(lane, false, this.synth.ctx.currentTime);
+        return;
+      }
+
+      const diff = Math.abs(this.currentTime - targetNote.time);
+
+      if (diff <= HIT_WINDOWS.SHIT) {
+        targetNote.processed = true;
+        targetNote.hit = true;
+
+        let scoreAdd = (diff <= HIT_WINDOWS.SICK) ? 350 : ((diff <= HIT_WINDOWS.GOOD) ? 200 : 100);
+        let hpAdd = (diff <= HIT_WINDOWS.SICK) ? 4.0 : 2.0;
+
+        this.p1Score += scoreAdd;
+        this.p1Combo++;
+        this.health = Math.max(0, this.health - hpAdd); // Push health towards P1 (left)
+
+        this.oppPose = LANE_NAMES[lane];
+        this.oppPoseTimer = 0.25;
+        this.synth.playVocalNote(lane, false, this.synth.ctx.currentTime);
+        this.synth.playHitSound();
+        this.spawnSparkles(lane, false);
+        this.updateHUD();
+      }
+    }
+
+    processP2Hit(lane) {
+      const targetNote = this.notes.find(n => n.isPlayer && !n.processed && n.lane === lane);
+
+      if (!targetNote) {
+        this.playerPose = LANE_NAMES[lane];
+        this.playerPoseTimer = 0.2;
+        this.synth.playVocalNote(lane, true, this.synth.ctx.currentTime);
+        return;
+      }
+
+      const diff = Math.abs(this.currentTime - targetNote.time);
+
+      if (diff <= HIT_WINDOWS.SHIT) {
+        targetNote.processed = true;
+        targetNote.hit = true;
+
+        let scoreAdd = (diff <= HIT_WINDOWS.SICK) ? 350 : ((diff <= HIT_WINDOWS.GOOD) ? 200 : 100);
+        let hpAdd = (diff <= HIT_WINDOWS.SICK) ? 4.0 : 2.0;
+
+        this.p2Score += scoreAdd;
+        this.p2Combo++;
+        this.health = Math.min(100, this.health + hpAdd); // Push health towards P2 (right)
+
+        this.playerPose = LANE_NAMES[lane];
+        this.playerPoseTimer = 0.25;
+        this.synth.playVocalNote(lane, true, this.synth.ctx.currentTime);
+        this.synth.playHitSound();
+        this.spawnSparkles(lane, true);
+        this.updateHUD();
+      }
+    }
+
+    handleP1Miss() {
+      this.p1Combo = 0;
+      this.oppPose = 'miss';
+      this.oppPoseTimer = 0.35;
+      this.synth.playMissScratch();
+      this.updateHUD();
+    }
+
+    handleP2Miss() {
+      this.p2Combo = 0;
+      this.playerPose = 'miss';
+      this.playerPoseTimer = 0.35;
+      this.synth.playMissScratch();
+      this.updateHUD();
     }
 
     handleMiss() {
@@ -731,7 +915,6 @@
       this.hits.miss++;
       this.totalNotesProcessed++;
 
-      // Gentle miss penalty
       if (this.noFailMode) {
         this.health = Math.max(15, this.health - 0.2);
       } else {
@@ -744,7 +927,6 @@
       this.showJudgement('MISS');
       this.updateHUD();
 
-      // Check Game Over (only if No Fail is OFF)
       if (!this.noFailMode && this.health <= 0) {
         this.triggerGameOver();
       }
@@ -765,13 +947,19 @@
     }
 
     updateHUD() {
-      document.getElementById('hudScore').textContent = this.score.toLocaleString();
-      document.getElementById('hudCombo').textContent = this.combo;
+      if (this.gameMode === '1P') {
+        document.getElementById('hudScore').textContent = this.score.toLocaleString();
+        document.getElementById('hudCombo').textContent = this.combo;
 
-      const accuracy = this.totalNotesProcessed > 0
-        ? ((this.totalNotesHit / this.totalNotesProcessed) * 100).toFixed(1)
-        : '100.0';
-      document.getElementById('hudAccuracy').textContent = `${accuracy}%`;
+        const accuracy = this.totalNotesProcessed > 0
+          ? ((this.totalNotesHit / this.totalNotesProcessed) * 100).toFixed(1)
+          : '100.0';
+        document.getElementById('hudAccuracy').textContent = `${accuracy}%`;
+      } else {
+        document.getElementById('hudScore').textContent = `P1: ${this.p1Score.toLocaleString()} | P2: ${this.p2Score.toLocaleString()}`;
+        document.getElementById('hudCombo').textContent = `P1: ${this.p1Combo}x | P2: ${this.p2Combo}x`;
+        document.getElementById('hudAccuracy').textContent = `1V1 VERSUS`;
+      }
     }
 
     updateHealthBarUI() {
@@ -813,23 +1001,29 @@
       this.state = 'RESULTS';
       [this.hudHeader, this.healthBarContainer, this.keyGuide].forEach(h => h.classList.add('hidden'));
 
-      const acc = this.totalNotesProcessed > 0 ? ((this.totalNotesHit / this.totalNotesProcessed) * 100) : 100;
+      if (this.gameMode === '1P') {
+        const acc = this.totalNotesProcessed > 0 ? ((this.totalNotesHit / this.totalNotesProcessed) * 100) : 100;
+        let rank = 'S';
+        if (acc === 100 && this.hits.miss === 0) rank = 'PERFECT FC';
+        else if (acc >= 95) rank = 'RANK S';
+        else if (acc >= 85) rank = 'RANK A';
+        else if (acc >= 75) rank = 'RANK B';
+        else rank = 'RANK C';
 
-      let rank = 'S';
-      if (acc === 100 && this.hits.miss === 0) rank = 'PERFECT FC';
-      else if (acc >= 95) rank = 'RANK S';
-      else if (acc >= 85) rank = 'RANK A';
-      else if (acc >= 75) rank = 'RANK B';
-      else rank = 'RANK C';
+        document.getElementById('ratingRankBadge').textContent = rank;
+        document.getElementById('resScore').textContent = this.score.toLocaleString();
+        document.getElementById('resAccuracy').textContent = `${acc.toFixed(1)}%`;
+        document.getElementById('resCombo').textContent = this.maxCombo;
+      } else {
+        let winnerText = 'TIE GAME! 🤝';
+        if (this.p1Score > this.p2Score) winnerText = 'P1 (WASD) WINS! 🏆';
+        else if (this.p2Score > this.p1Score) winnerText = 'P2 (ARROWS) WINS! 🏆';
 
-      document.getElementById('ratingRankBadge').textContent = rank;
-      document.getElementById('resScore').textContent = this.score.toLocaleString();
-      document.getElementById('resAccuracy').textContent = `${acc.toFixed(1)}%`;
-      document.getElementById('resCombo').textContent = this.maxCombo;
-      document.getElementById('resSick').textContent = this.hits.sick;
-      document.getElementById('resGood').textContent = this.hits.good;
-      document.getElementById('resBad').textContent = this.hits.bad;
-      document.getElementById('resMiss').textContent = this.hits.miss;
+        document.getElementById('ratingRankBadge').textContent = winnerText;
+        document.getElementById('resScore').textContent = `P1: ${this.p1Score.toLocaleString()} vs P2: ${this.p2Score.toLocaleString()}`;
+        document.getElementById('resAccuracy').textContent = `1V1 LOCAL VERSUS`;
+        document.getElementById('resCombo').textContent = `P1: ${this.p1Combo}x | P2: ${this.p2Combo}x`;
+      }
 
       this.resultsScreen.classList.remove('hidden');
     }

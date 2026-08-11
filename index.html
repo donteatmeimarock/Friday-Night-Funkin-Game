@@ -47,11 +47,15 @@
 
       <!-- Key Binds Visual Guide (Bottom) -->
       <div id="keyGuide" class="hud-element hidden">
-        <div class="key-group">
+        <div id="keyGuide1P" class="key-group">
           <span class="key-cap purp">← / A</span>
           <span class="key-cap cyan">↓ / S</span>
           <span class="key-cap green">↑ / W</span>
           <span class="key-cap red">→ / D</span>
+        </div>
+        <div id="keyGuide2P" class="key-group hidden" style="gap: 24px;">
+          <div class="p-guide"><b style="color: #ff0055;">P1 (LEFT):</b> <span class="key-cap purp">A</span> <span class="key-cap cyan">S</span> <span class="key-cap green">W</span> <span class="key-cap red">D</span></div>
+          <div class="p-guide"><b style="color: #00ffff;">P2 (RIGHT):</b> <span class="key-cap purp">←</span> <span class="key-cap cyan">↓</span> <span class="key-cap green">↑</span> <span class="key-cap red">→</span></div>
         </div>
       </div>
 
@@ -66,9 +70,12 @@
 
           <div class="menu-actions">
             <button id="btnPlay" class="btn primary-btn">
-              <span class="btn-icon">⚡</span> PLAY NOW
+              <span class="btn-icon">⚡</span> 1 PLAYER (VS BOT)
             </button>
-            <button id="btnFreeplay" class="btn secondary-btn">
+            <button id="btn2Player" class="btn secondary-btn" style="background: linear-gradient(135deg, #ff0055, #af00ff);">
+              <span class="btn-icon">👥</span> 2 PLAYERS (1V1 VERSUS)
+            </button>
+            <button id="btnFreeplay" class="btn tertiary-btn">
               <span class="btn-icon">🎵</span> SONG SELECT
             </button>
             <button id="btnEditor" class="btn tertiary-btn">
@@ -79,9 +86,8 @@
           <div class="controls-card">
             <h3>Controls</h3>
             <div class="control-tags">
-              <span><b>Arrows</b> (← ↓ ↑ →)</span>
-              <span><b>WASD</b> (A S W D)</span>
-              <span><b>Space / Enter</b> Select</span>
+              <span><b>P1 (Left)</b> WASD (A S W D)</span>
+              <span><b>P2 (Right)</b> Arrows (← ↓ ↑ →)</span>
               <span><b>P / Esc</b> Pause</span>
             </div>
           </div>
@@ -98,7 +104,13 @@
             <!-- Dynamically Populated Songs -->
           </div>
 
-          <div class="difficulty-picker">
+          <div class="difficulty-picker" style="flex-wrap: wrap; justify-content: center; gap: 8px;">
+            <span>MODE:</span>
+            <button class="mode-btn active" data-mode="1P">1 PLAYER (VS BOT)</button>
+            <button class="mode-btn" data-mode="2P">2 PLAYERS (1V1)</button>
+          </div>
+
+          <div class="difficulty-picker" style="margin-top: 10px;">
             <span>DIFFICULTY:</span>
             <button class="diff-btn active" data-diff="easy">EASY</button>
             <button class="diff-btn" data-diff="normal">NORMAL</button>
