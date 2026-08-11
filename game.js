@@ -345,6 +345,11 @@
       this.ctx = this.canvas.getContext('2d');
       this.synth = new FNFSynthEngine();
 
+      // DOM Elements
+      this.canvas = document.getElementById('gameCanvas');
+      this.ctx = this.canvas.getContext('2d');
+      this.synth = new FNFSynthEngine();
+
       // UI Overlays
       this.menuScreen = document.getElementById('menuScreen');
       this.songSelectScreen = document.getElementById('songSelectScreen');
@@ -352,13 +357,19 @@
       this.gameOverScreen = document.getElementById('gameOverScreen');
       this.resultsScreen = document.getElementById('resultsScreen');
       this.chartEditorScreen = document.getElementById('chartEditorScreen');
+      this.achievementsScreen = document.getElementById('achievementsScreen');
       this.hudHeader = document.getElementById('hudHeader');
       this.healthBarContainer = document.getElementById('healthBarContainer');
       this.keyGuide = document.getElementById('keyGuide');
       this.judgementContainer = document.getElementById('judgementContainer');
 
+      // Persistence: High Scores & Achievements
+      this.highScores = JSON.parse(localStorage.getItem('fnf_highscores') || '{}');
+      this.levelResults = JSON.parse(localStorage.getItem('fnf_level_results') || '{}');
+      this.achievements = JSON.parse(localStorage.getItem('fnf_achievements') || '{"god":false,"beatTheGuy":false,"generationalBeats":false}');
+
       // State flags
-      this.state = 'MENU'; // MENU, SONG_SELECT, PLAYING, PAUSED, GAME_OVER, RESULTS, EDITOR
+      this.state = 'MENU'; // MENU, SONG_SELECT, PLAYING, PAUSED, GAME_OVER, RESULTS, EDITOR, ACHIEVEMENTS
       this.gameMode = '1P'; // '1P' (vs Bot) or '2P' (Local Versus)
       this.selectedSong = SONG_CATALOG[0];
       this.selectedDiff = 'easy';
@@ -435,6 +446,16 @@
         };
       }
 
+      const btnAch = document.getElementById('btnAchievements');
+      if (btnAch) {
+        btnAch.onclick = () => this.openAchievements();
+      }
+
+      const btnCloseAch = document.getElementById('btnCloseAchievements');
+      if (btnCloseAch) {
+        btnCloseAch.onclick = () => this.showMenu();
+      }
+
       document.getElementById('btnFreeplay').onclick = () => this.openSongSelect();
       document.getElementById('btnEditor').onclick = () => this.openChartEditor();
       document.getElementById('btnBackToMenu').onclick = () => this.showMenu();
@@ -487,6 +508,34 @@
       this.renderSongList();
     }
 
+    openAchievements() {
+      this.state = 'ACHIEVEMENTS';
+      this.hideAllScreens();
+      if (this.achievementsScreen) {
+        this.achievementsScreen.classList.remove('hidden');
+      }
+
+      this.updateAchievementCard('achGod', this.achievements.god);
+      this.updateAchievementCard('achBeatTheGuy', this.achievements.beatTheGuy);
+      this.updateAchievementCard('achGenerationalBeats', this.achievements.generationalBeats);
+    }
+
+    updateAchievementCard(id, isUnlocked) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (isUnlocked) {
+        el.classList.remove('locked');
+        el.classList.add('unlocked');
+        const statusEl = el.querySelector('.ach-status');
+        if (statusEl) statusEl.textContent = 'UNLOCKED 🏆';
+      } else {
+        el.classList.remove('unlocked');
+        el.classList.add('locked');
+        const statusEl = el.querySelector('.ach-status');
+        if (statusEl) statusEl.textContent = 'LOCKED 🔒';
+      }
+    }
+
     updateModeButtonsUI() {
       document.querySelectorAll('.mode-btn').forEach(btn => {
         if (btn.dataset.mode === this.gameMode) btn.classList.add('active');
@@ -519,12 +568,17 @@
       SONG_CATALOG.forEach(song => {
         const card = document.createElement('div');
         card.className = `song-card ${song.id === this.selectedSong.id ? 'selected' : ''}`;
+        const highScore = this.highScores[song.id] || 0;
+
         card.innerHTML = `
           <div class="song-meta">
             <h4>${song.title}</h4>
             <p>Artist: ${song.artist} • Vs: ${song.opponent}</p>
           </div>
-          <div class="song-bpm">⚡ ${song.bpm} BPM</div>
+          <div class="song-scores">
+            <div class="song-bpm">⚡ ${song.bpm} BPM</div>
+            <div class="song-highscore">🏆 BEST: ${highScore.toLocaleString()}</div>
+          </div>
         `;
         card.onclick = () => {
           document.querySelectorAll('.song-card').forEach(c => c.classList.remove('selected'));
@@ -536,9 +590,11 @@
     }
 
     hideAllScreens() {
-      [this.menuScreen, this.songSelectScreen, this.pauseScreen, this.gameOverScreen, this.resultsScreen, this.chartEditorScreen].forEach(s => {
-        s.classList.add('hidden');
-        s.classList.remove('active');
+      [this.menuScreen, this.songSelectScreen, this.pauseScreen, this.gameOverScreen, this.resultsScreen, this.chartEditorScreen, this.achievementsScreen].forEach(s => {
+        if (s) {
+          s.classList.add('hidden');
+          s.classList.remove('active');
+        }
       });
       [this.hudHeader, this.healthBarContainer, this.keyGuide].forEach(h => h.classList.add('hidden'));
     }
@@ -578,6 +634,12 @@
 
       this.health = (this.gameMode === '2P') ? 50 : 75; // 50/50 split in 2P versus, 75% in 1P casual!
       this.scheduledBeat = 0;
+
+      // Check Beat the Guy Achievement (2 Player Mode)
+      if (this.gameMode === '2P' && !this.achievements.beatTheGuy) {
+        this.achievements.beatTheGuy = true;
+        localStorage.setItem('fnf_achievements', JSON.stringify(this.achievements));
+      }
 
       // Key Guide Switch
       const guide1P = document.getElementById('keyGuide1P');
@@ -677,11 +739,56 @@
       }
     }
 
-    // Process Notes (Opponent Bot Auto-hit in 1P, or 2P manual hit checks)
+    // Process Notes (Opponent Bot Auto-hit in 1P, 2P manual hits, & Hold Ticks)
     updateNotes() {
       const windowMiss = HIT_WINDOWS.SHIT;
 
       this.notes.forEach(note => {
+        // --- HOLD NOTE TICK PROCESSING (Every 0.5s) ---
+        if (note.hold > 0 && this.currentTime >= note.time && this.currentTime <= note.time + note.hold) {
+          if (note.lastHoldTick === undefined) {
+            note.lastHoldTick = note.time;
+          }
+
+          while (this.currentTime - note.lastHoldTick >= 0.5) {
+            note.lastHoldTick += 0.5;
+
+            // Check if key for this lane is currently pressed
+            const isHeld = note.isPlayer
+              ? (this.gameMode === '1P' ? this.pressedLanes[note.lane] : this.p2PressedLanes[note.lane])
+              : this.p1PressedLanes[note.lane];
+
+            if (isHeld) {
+              // Holding gives 1/8th of a normal SICK beat health (+5.0% / 8 = +0.625% HP) & score
+              const hpGain = 5.0 / 8;
+              if (note.isPlayer) {
+                this.health = Math.min(100, this.health + hpGain);
+                this.score += 45;
+              } else {
+                this.health = Math.max(0, this.health - hpGain);
+                if (this.gameMode === '2P') this.p1Score += 45;
+              }
+              this.spawnSparkles(note.lane, note.isPlayer);
+              this.updateHUD();
+            } else {
+              // Not holding counts as an extra small miss every 0.5 sec (1/8th of a normal miss)
+              const missDmg = this.noFailMode ? (0.2 / 8) : (0.8 / 8);
+              if (note.isPlayer) {
+                if (this.noFailMode) this.health = Math.max(15, this.health - missDmg);
+                else this.health = Math.max(0, this.health - missDmg);
+                this.playerPose = 'miss';
+                this.playerPoseTimer = 0.2;
+              } else if (this.gameMode === '2P') {
+                this.health = Math.min(100, this.health + missDmg);
+                this.oppPose = 'miss';
+                this.oppPoseTimer = 0.2;
+              }
+              this.synth.playMissScratch();
+              this.updateHUD();
+            }
+          }
+        }
+
         if (note.processed) return;
 
         if (this.gameMode === '1P') {
@@ -1014,6 +1121,44 @@
         document.getElementById('resScore').textContent = this.score.toLocaleString();
         document.getElementById('resAccuracy').textContent = `${acc.toFixed(1)}%`;
         document.getElementById('resCombo').textContent = this.maxCombo;
+
+        // 1. Save High Score for Level
+        const currentBest = this.highScores[this.selectedSong.id] || 0;
+        if (this.score > currentBest) {
+          this.highScores[this.selectedSong.id] = this.score;
+          localStorage.setItem('fnf_highscores', JSON.stringify(this.highScores));
+        }
+
+        // 2. Record Level Result for Achievements
+        const isAllSick = (this.totalNotesHit > 0 && this.hits.good === 0 && this.hits.bad === 0 && this.hits.shit === 0 && this.hits.miss === 0);
+        this.levelResults[this.selectedSong.id] = {
+          score: Math.max(this.score, (this.levelResults[this.selectedSong.id]?.score || 0)),
+          noFail: this.noFailMode,
+          allSick: (isAllSick || (this.levelResults[this.selectedSong.id]?.allSick || false))
+        };
+        localStorage.setItem('fnf_level_results', JSON.stringify(this.levelResults));
+
+        // 3. Evaluate "God" Achievement (win all levels without No-Fail mode with score >= 15000)
+        const songIds = SONG_CATALOG.map(s => s.id);
+        const godUnlocked = songIds.every(id => {
+          const res = this.levelResults[id];
+          return res && !res.noFail && res.score >= 15000;
+        });
+        if (godUnlocked) {
+          this.achievements.god = true;
+        }
+
+        // 4. Evaluate "Generational Beats" Achievement (finish every level with all hits "SICK")
+        const genUnlocked = songIds.every(id => {
+          const res = this.levelResults[id];
+          return res && res.allSick;
+        });
+        if (genUnlocked) {
+          this.achievements.generationalBeats = true;
+        }
+
+        localStorage.setItem('fnf_achievements', JSON.stringify(this.achievements));
+
       } else {
         let winnerText = 'TIE GAME! 🤝';
         if (this.p1Score > this.p2Score) winnerText = 'P1 (WASD) WINS! 🏆';
@@ -1023,6 +1168,12 @@
         document.getElementById('resScore').textContent = `P1: ${this.p1Score.toLocaleString()} vs P2: ${this.p2Score.toLocaleString()}`;
         document.getElementById('resAccuracy').textContent = `1V1 LOCAL VERSUS`;
         document.getElementById('resCombo').textContent = `P1: ${this.p1Combo}x | P2: ${this.p2Combo}x`;
+
+        // 2 Player Achievement
+        if (!this.achievements.beatTheGuy) {
+          this.achievements.beatTheGuy = true;
+          localStorage.setItem('fnf_achievements', JSON.stringify(this.achievements));
+        }
       }
 
       this.resultsScreen.classList.remove('hidden');

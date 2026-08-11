@@ -509,10 +509,81 @@ html, body {
   color: rgba(255, 255, 255, 0.6);
 }
 
+.song-card .song-scores {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
 .song-card .song-bpm {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--yellow-accent);
+}
+
+.song-card .song-highscore {
+  font-size: 12px;
+  font-weight: 800;
+  color: #00ffff;
+  margin-top: 2px;
+}
+
+/* Achievements Modal Styling */
+.achievements-card {
+  width: min(600px, 94vw);
+}
+
+.achievement-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 14px 18px;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.achievement-item.unlocked {
+  background: rgba(255, 204, 0, 0.12);
+  border-color: var(--yellow-accent);
+  box-shadow: 0 0 16px rgba(255, 204, 0, 0.25);
+}
+
+.achievement-item .ach-icon {
+  font-size: 32px;
+}
+
+.achievement-item .ach-info {
+  flex: 1;
+}
+
+.achievement-item .ach-info h4 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: #fff;
+}
+
+.achievement-item.unlocked .ach-info h4 {
+  color: var(--yellow-accent);
+}
+
+.achievement-item .ach-info p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.achievement-item .ach-status {
+  font-weight: 900;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.achievement-item.unlocked .ach-status {
+  color: #31ff7e;
+  text-shadow: 0 0 8px #31ff7e;
 }
 
 .difficulty-picker {

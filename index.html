@@ -75,6 +75,9 @@
             <button id="btn2Player" class="btn secondary-btn" style="background: linear-gradient(135deg, #ff0055, #af00ff);">
               <span class="btn-icon">👥</span> 2 PLAYERS (1V1 VERSUS)
             </button>
+            <button id="btnAchievements" class="btn secondary-btn" style="background: linear-gradient(135deg, #ffcc00, #ff8800); color: #000;">
+              <span class="btn-icon">🏆</span> ACHIEVEMENTS
+            </button>
             <button id="btnFreeplay" class="btn tertiary-btn">
               <span class="btn-icon">🎵</span> SONG SELECT
             </button>
@@ -122,6 +125,43 @@
             <button id="btnBackToMenu" class="btn secondary-btn">← BACK TO MENU</button>
             <button id="btnStartSelectedSong" class="btn primary-btn">START SONG ▶</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Achievements Screen Modal -->
+      <div id="achievementsScreen" class="screen-overlay hidden">
+        <div class="backdrop-glow gold-glow"></div>
+        <div class="menu-card achievements-card">
+          <h2>🏆 ACHIEVEMENTS</h2>
+          <div class="achievements-list" style="display: flex; flex-direction: column; gap: 14px; width: 100%; margin-top: 16px;">
+            <div id="achGod" class="achievement-item locked">
+              <div class="ach-icon">⚡</div>
+              <div class="ach-info">
+                <h4>God</h4>
+                <p>Win all levels (without No-Fail mode) with a score of 15,000 or higher.</p>
+              </div>
+              <div class="ach-status">LOCKED 🔒</div>
+            </div>
+
+            <div id="achBeatTheGuy" class="achievement-item locked">
+              <div class="ach-icon">👥</div>
+              <div class="ach-info">
+                <h4>Beat the Guy</h4>
+                <p>Play a game of 2 Player mode.</p>
+              </div>
+              <div class="ach-status">LOCKED 🔒</div>
+            </div>
+
+            <div id="achGenerationalBeats" class="achievement-item locked">
+              <div class="ach-icon">👑</div>
+              <div class="ach-info">
+                <h4>Generational Beats</h4>
+                <p>Finish every level with all hits rated "SICK".</p>
+              </div>
+              <div class="ach-status">LOCKED 🔒</div>
+            </div>
+          </div>
+          <button id="btnCloseAchievements" class="btn secondary-btn" style="margin-top: 20px;">CLOSE</button>
         </div>
       </div>
 
