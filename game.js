@@ -20,12 +20,12 @@
     'ArrowRight': 3, 'KeyD': 3
   };
 
-  // Hit Windows in Seconds
+  // Hit Windows in Seconds (Very Forgiving & Easy)
   const HIT_WINDOWS = {
-    SICK: 0.045,  // 45ms
-    GOOD: 0.090,  // 90ms
-    BAD: 0.135,   // 135ms
-    SHIT: 0.180   // 180ms
+    SICK: 0.120,  // 120ms (Very easy SICK rating)
+    GOOD: 0.220,  // 220ms
+    BAD: 0.320,   // 320ms
+    SHIT: 0.420   // 420ms (Almost half a second leeway!)
   };
 
   // --- AUDIO SYNTHESIZER ENGINE ---
@@ -356,12 +356,13 @@
       // State flags
       this.state = 'MENU'; // MENU, SONG_SELECT, PLAYING, PAUSED, GAME_OVER, RESULTS, EDITOR
       this.selectedSong = SONG_CATALOG[0];
-      this.selectedDiff = 'normal';
+      this.selectedDiff = 'easy';
+      this.noFailMode = true;
       this.notes = [];
       this.startTime = 0;
       this.currentTime = 0;
       this.songDuration = 0;
-      this.scrollSpeed = 2.2;
+      this.scrollSpeed = 1.4;
       this.bpm = 120;
       this.animFrameId = null;
 
@@ -372,7 +373,7 @@
       this.hits = { sick: 0, good: 0, bad: 0, shit: 0, miss: 0 };
       this.totalNotesHit = 0;
       this.totalNotesProcessed = 0;
-      this.health = 50; // 0 to 100
+      this.health = 75; // 0 to 100
 
       // Input State
       this.pressedLanes = [false, false, false, false];
@@ -418,10 +419,23 @@
       document.getElementById('btnResReplay').onclick = () => this.startSong();
       document.getElementById('btnResNext').onclick = () => this.nextSong();
 
+      const noFailBtn = document.getElementById('btnNoFailToggle');
+      if (noFailBtn) {
+        noFailBtn.onclick = () => {
+          this.noFailMode = !this.noFailMode;
+          noFailBtn.textContent = this.noFailMode ? '🛡️ NO FAIL: ON' : '🛡️ NO FAIL: OFF';
+          noFailBtn.style.background = this.noFailMode ? '#31ff7e' : 'rgba(255,255,255,0.1)';
+          noFailBtn.style.color = this.noFailMode ? '#000' : '#fff';
+        };
+      }
+
       // Difficulty buttons
       document.querySelectorAll('.diff-btn').forEach(btn => {
+        if (btn.id === 'btnNoFailToggle') return;
         btn.onclick = () => {
-          document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.diff-btn').forEach(b => {
+            if (b.id !== 'btnNoFailToggle') b.classList.remove('active');
+          });
           btn.classList.add('active');
           this.selectedDiff = btn.dataset.diff;
         };
@@ -494,9 +508,12 @@
       [this.hudHeader, this.healthBarContainer, this.keyGuide].forEach(h => h.classList.remove('hidden'));
 
       // Copy chart notes for selected difficulty
-      const songData = this.selectedSong[this.selectedDiff] || this.selectedSong.normal;
+      const songData = this.selectedSong[this.selectedDiff] || this.selectedSong.easy || this.selectedSong.normal;
       this.notes = JSON.parse(JSON.stringify(songData.notes));
-      this.scrollSpeed = this.selectedSong.scrollSpeed;
+
+      // Slower, forgiving scroll speed scaling for casual play
+      const speedMult = this.selectedDiff === 'easy' ? 0.6 : (this.selectedDiff === 'normal' ? 0.8 : 1.0);
+      this.scrollSpeed = this.selectedSong.scrollSpeed * speedMult;
       this.bpm = this.selectedSong.bpm;
       this.songDuration = Math.max(...this.notes.map(n => n.time)) + 3.0;
 
@@ -507,7 +524,7 @@
       this.hits = { sick: 0, good: 0, bad: 0, shit: 0, miss: 0 };
       this.totalNotesHit = 0;
       this.totalNotesProcessed = 0;
-      this.health = 50;
+      this.health = 75; // Starting with 75% health
       this.scheduledBeat = 0;
 
       // Update HUD Labels
@@ -651,8 +668,10 @@
       const targetNote = this.notes.find(n => n.isPlayer && !n.processed && n.lane === lane);
 
       if (!targetNote) {
-        // Over-strum Miss
-        this.handleMiss();
+        // Pressing key without note - play vocal tone without health penalty
+        this.playerPose = LANE_NAMES[lane];
+        this.playerPoseTimer = 0.2;
+        this.synth.playVocalNote(lane, true, this.synth.ctx.currentTime);
         return;
       }
 
@@ -664,23 +683,23 @@
 
         let rating = 'SHIT';
         let scoreAdd = 50;
-        let hpAdd = -1.8;
+        let hpAdd = 0.5;
 
         if (diff <= HIT_WINDOWS.SICK) {
           rating = 'SICK';
           scoreAdd = 350;
-          hpAdd = 2.5;
+          hpAdd = 5.0;
           this.hits.sick++;
           this.spawnSparkles(lane);
         } else if (diff <= HIT_WINDOWS.GOOD) {
           rating = 'GOOD';
           scoreAdd = 200;
-          hpAdd = 1.2;
+          hpAdd = 3.0;
           this.hits.good++;
         } else if (diff <= HIT_WINDOWS.BAD) {
           rating = 'BAD';
           scoreAdd = 100;
-          hpAdd = -0.5;
+          hpAdd = 1.5;
           this.hits.bad++;
         } else {
           this.hits.shit++;
@@ -711,15 +730,22 @@
       this.combo = 0;
       this.hits.miss++;
       this.totalNotesProcessed++;
-      this.health = Math.max(0, this.health - 3.5);
+
+      // Gentle miss penalty
+      if (this.noFailMode) {
+        this.health = Math.max(15, this.health - 0.2);
+      } else {
+        this.health = Math.max(0, this.health - 0.8);
+      }
+
       this.playerPose = 'miss';
       this.playerPoseTimer = 0.35;
       this.synth.playMissScratch();
       this.showJudgement('MISS');
       this.updateHUD();
 
-      // Check Game Over
-      if (this.health <= 0) {
+      // Check Game Over (only if No Fail is OFF)
+      if (!this.noFailMode && this.health <= 0) {
         this.triggerGameOver();
       }
     }
